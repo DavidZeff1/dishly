@@ -11,15 +11,10 @@ Table User {
   phone String [unique]
   profilePic String
   isActive Boolean [not null, default: true]
-  deletedAt DateTime
-  createdBy String
-  updatedBy String
   chefProfile ChefProfile
   orders Order [not null]
   reviews Review [not null]
   payments Payment [not null]
-  notifications Notification [not null]
-  addresses Address [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
 }
@@ -32,84 +27,37 @@ Table ChefProfile {
   cuisineTags String[] [not null]
   isVerified Boolean [not null, default: false]
   isActive Boolean [not null, default: true]
-  deliveryRadius Decimal
-  minOrderAmount Decimal
-  avgDeliveryTime Int
-  maxOrdersPerDay Int
-  commissionRate Decimal [not null, default: 0.15]
-  deletedAt DateTime
-  createdBy String
-  updatedBy String
-  addresses Address [not null]
-  dishes dishes [not null]
+  address String [not null]
+  city String [not null]
+  state String
+  country String [not null, default: 'US']
+  latitude Decimal
+  longitude Decimal
+  deliveryRadius Decimal [not null, default: 10]
+  minOrderAmount Decimal [not null, default: 15]
+  avgDeliveryTime Int [not null, default: 45]
+  dishes Dish [not null]
   orders Order [not null]
   reviews Review [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
 }
 
-Table Address {
-  id String [pk]
-  user User
-  userId String
-  chef ChefProfile
-  chefId String
-  type AddressType [not null, default: 'OTHER']
-  label String
-  addressLine1 String [not null]
-  addressLine2 String
-  city String [not null]
-  state String
-  country String [not null, default: 'US']
-  postalCode String [not null]
-  latitude Decimal
-  longitude Decimal
-  isDefault Boolean [not null, default: false]
-  isActive Boolean [not null, default: true]
-  instructions String
-  orders Order [not null]
-  createdAt DateTime [default: `now()`, not null]
-  updatedAt DateTime [not null]
-}
-
-Table dishes {
+Table Dish {
   id String [pk]
   chef ChefProfile [not null]
   chefId String [not null]
   title String [not null]
   description String [not null]
   price Decimal [not null]
-  currency String [not null, default: 'USD']
-  images DishImage [not null]
+  images String[] [not null]
   isAvailable Boolean [not null, default: true]
   tags String[] [not null]
-  preparationTime Int
-  servingSize String
-  allergens String[] [not null]
-  nutritionInfo Json
-  spiceLevel Int
-  slug String [unique]
   category String
-  deletedAt DateTime
-  createdBy String
-  updatedBy String
+  preparationTime Int
   orderItems OrderItem [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-}
-
-Table DishImage {
-  id String [pk]
-  dish dishes [not null]
-  dishId String [not null]
-  url String [not null]
-  isCover Boolean [not null, default: false]
-  altText String
-  width Int
-  height Int
-  fileSize Int
-  format String
-  createdAt DateTime [default: `now()`, not null]
 }
 
 Table Order {
@@ -122,23 +70,13 @@ Table Order {
   status OrderStatus [not null, default: 'PENDING']
   items OrderItem [not null]
   totalPrice Decimal [not null]
-  currency String [not null, default: 'USD']
   notes String
-  deliveryAddress Address
-  deliveryAddressId String
-  deliveryInstructions String
-  deliveryFee Decimal
-  requestedDeliveryTime DateTime
+  deliveryAddress String [not null]
+  deliveryFee Decimal [not null, default: 5]
   estimatedDeliveryTime DateTime
   actualDeliveryTime DateTime
-  cancelledAt DateTime
-  cancellationReason String
-  cancelledBy String
-  platformFee Decimal
-  chefEarnings Decimal
   payment Payment
   review Review
-  notifications Notification [not null]
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
 }
@@ -147,16 +85,12 @@ Table OrderItem {
   id String [pk]
   order Order [not null]
   orderId String [not null]
-  dish dishes [not null]
+  dish Dish [not null]
   dishId String [not null]
   quantity Int [not null, default: 1]
   unitPrice Decimal [not null]
-  totalPrice Decimal [not null]
-  currency String [not null, default: 'USD']
   dishTitle String [not null]
   dishDescription String
-  specialRequests String
-  createdAt DateTime [default: `now()`, not null]
 }
 
 Table Review {
@@ -169,16 +103,7 @@ Table Review {
   chefId String [not null]
   order Order [not null]
   orderId String [unique, not null]
-  foodQuality Int
-  deliverySpeed Int
-  presentation Int
-  communication Int
-  isModerated Boolean [not null, default: false]
-  isVisible Boolean [not null, default: true]
-  moderatedBy String
-  moderatedAt DateTime
   createdAt DateTime [default: `now()`, not null]
-  updatedAt DateTime [not null]
 
   indexes {
     (customerId, orderId) [unique]
@@ -194,137 +119,45 @@ Table Payment {
   provider String [not null]
   providerId String [not null]
   amount Decimal [not null]
-  currency String [not null, default: 'USD']
   status PaymentStatus [not null, default: 'PENDING']
-  paymentMethod String
-  paymentMethodId String
-  failureReason String
-  failureCode String
-  refundAmount Decimal
-  refundReason String
-  refundedAt DateTime
-  refundedBy String
-  metadata Json
   createdAt DateTime [default: `now()`, not null]
   updatedAt DateTime [not null]
-}
-
-Table Notification {
-  id String [pk]
-  user User [not null]
-  userId String [not null]
-  order Order
-  orderId String
-  type NotificationType [not null]
-  title String [not null]
-  message String [not null]
-  data Json
-  isRead Boolean [not null, default: false]
-  readAt DateTime
-  isSent Boolean [not null, default: false]
-  sentAt DateTime
-  deliveryMethod String
-  createdAt DateTime [default: `now()`, not null]
-  updatedAt DateTime [not null]
-}
-
-Table AppConfig {
-  id String [pk]
-  key String [unique, not null]
-  value String [not null]
-  description String
-  dataType String [not null, default: 'string']
-  updatedBy String
-  createdAt DateTime [default: `now()`, not null]
-  updatedAt DateTime [not null]
-}
-
-Table Currency {
-  id String [pk]
-  code String [unique, not null]
-  name String [not null]
-  symbol String [not null]
-  exchangeRate Decimal [not null]
-  isActive Boolean [not null, default: true]
-  updatedAt DateTime [not null]
-  createdAt DateTime [default: `now()`, not null]
 }
 
 Enum Role {
   CUSTOMER
   CHEF
   ADMIN
-  MODERATOR
 }
 
 Enum OrderStatus {
   PENDING
   ACCEPTED
   IN_PREPARATION
-  READY_FOR_PICKUP
   READY_FOR_DELIVERY
   OUT_FOR_DELIVERY
   DELIVERED
-  REJECTED
-  CANCELLED_BY_CUSTOMER
-  CANCELLED_BY_CHEF
-  REFUND_REQUESTED
-  REFUNDED
+  CANCELLED
 }
 
 Enum PaymentStatus {
   PENDING
-  PROCESSING
   PAID
   FAILED
   REFUNDED
-  PARTIALLY_REFUNDED
-  CANCELLED
-}
-
-Enum AddressType {
-  HOME
-  WORK
-  RESTAURANT
-  OTHER
-}
-
-Enum NotificationType {
-  ORDER_PLACED
-  ORDER_ACCEPTED
-  ORDER_REJECTED
-  ORDER_IN_PREPARATION
-  ORDER_READY
-  ORDER_OUT_FOR_DELIVERY
-  ORDER_DELIVERED
-  ORDER_CANCELLED
-  PAYMENT_SUCCESS
-  PAYMENT_FAILED
-  REVIEW_RECEIVED
-  CHEF_APPLICATION_STATUS
-  SYSTEM_ANNOUNCEMENT
-  PROMOTIONAL
 }
 
 Ref: ChefProfile.userId - User.id [delete: Cascade]
 
-Ref: Address.userId > User.id [delete: Cascade]
-
-Ref: Address.chefId > ChefProfile.id [delete: Cascade]
-
-Ref: dishes.chefId > ChefProfile.id [delete: Cascade]
-
-Ref: DishImage.dishId > dishes.id [delete: Cascade]
+Ref: Dish.chefId > ChefProfile.id [delete: Cascade]
 
 Ref: Order.customerId > User.id
 
 Ref: Order.chefId > ChefProfile.id
 
-Ref: Order.deliveryAddressId > Address.id
-
 Ref: OrderItem.orderId > Order.id [delete: Cascade]
 
-Ref: OrderItem.dishId > dishes.id
+Ref: OrderItem.dishId > Dish.id
 
 Ref: Review.customerId > User.id
 
@@ -335,7 +168,3 @@ Ref: Review.orderId - Order.id
 Ref: Payment.userId > User.id
 
 Ref: Payment.orderId - Order.id
-
-Ref: Notification.userId > User.id [delete: Cascade]
-
-Ref: Notification.orderId > Order.id [delete: Cascade]
