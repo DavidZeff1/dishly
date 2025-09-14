@@ -424,3 +424,9 @@ enum NotificationType {
   SYSTEM_ANNOUNCEMENT
   PROMOTIONAL
 }
+
+generator dbml {
+  provider = "prisma-dbml-generator"
+  output   = "../docs"
+  outputName = "database-schema.dbml"
+}
