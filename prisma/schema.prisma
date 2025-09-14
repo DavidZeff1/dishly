@@ -1,0 +1,426 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  name        String
+  email       String    @unique
+  password    String
+  role        Role      @default(CUSTOMER)
+  phone       String?   @unique
+  profilePic  String?   // Cloudinary URL
+  isActive    Boolean   @default(true)
+  
+  // Audit fields
+  deletedAt   DateTime?
+  createdBy   String?
+  updatedBy   String?
+  
+  // Relations
+  chefProfile   ChefProfile?
+  orders        Order[]         @relation("CustomerOrders")
+  reviews       Review[]        @relation("CustomerReviews")
+  payments      Payment[]
+  notifications Notification[]
+  addresses     Address[]
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  @@index([email])
+  @@index([phone])
+  @@index([isActive])
+  @@index([deletedAt])
+}
+
+model ChefProfile {
+  id            String    @id @default(cuid())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String    @unique
+  bio           String?
+  cuisineTags   String[]
+  isVerified    Boolean   @default(false)
+  isActive      Boolean   @default(true)
+  
+  // Business settings
+  deliveryRadius    Decimal?  @db.Decimal(5, 2) // in kilometers
+  minOrderAmount    Decimal?  @db.Decimal(10, 2)
+  avgDeliveryTime   Int?      // in minutes
+  maxOrdersPerDay   Int?
+  commissionRate    Decimal   @default(0.15) @db.Decimal(5, 4) // 15%
+  
+  // Audit fields
+  deletedAt     DateTime?
+  createdBy     String?
+  updatedBy     String?
+  
+  // Relations
+  addresses     Address[]
+  dishes        Dish[]
+  orders        Order[]     @relation("ChefOrders")
+  reviews       Review[]    @relation("ChefReviews")
+  
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  @@index([isActive, isVerified])
+  @@index([deliveryRadius])
+  @@index([deletedAt])
+}
+
+model Address {
+  id            String       @id @default(cuid())
+  user          User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String?
+  chef          ChefProfile? @relation(fields: [chefId], references: [id], onDelete: Cascade)
+  chefId        String?
+  
+  // Address details
+  type          AddressType  @default(OTHER)
+  label         String?      // "Home", "Office", etc.
+  addressLine1  String
+  addressLine2  String?
+  city          String
+  state         String?
+  country       String       @default("US")
+  postalCode    String
+  latitude      Decimal?     @db.Decimal(10, 8)
+  longitude     Decimal?     @db.Decimal(11, 8)
+  
+  // Metadata
+  isDefault     Boolean      @default(false)
+  isActive      Boolean      @default(true)
+  instructions  String?      // Delivery instructions
+  
+  // Relations
+  orders        Order[]
+  
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  
+  @@index([userId])
+  @@index([chefId])
+  @@index([city, state, country])
+  @@index([latitude, longitude])
+}
+
+model Dish {
+  id              String      @id @default(cuid())
+  chef            ChefProfile @relation(fields: [chefId], references: [id], onDelete: Cascade)
+  chefId          String
+  title           String
+  description     String
+  price           Decimal     @db.Decimal(10, 2)
+  currency        String      @default("USD")
+  images          DishImage[]
+  isAvailable     Boolean     @default(true)
+  tags            String[]    // ["spicy", "gluten-free"]
+  
+  // Food details
+  preparationTime Int?        // in minutes
+  servingSize     String?     // "Serves 2-3 people"
+  allergens       String[]    // ["nuts", "dairy", "gluten"]
+  nutritionInfo   Json?       // Flexible nutrition data
+  spiceLevel      Int?        @db.SmallInt // 1-5 scale
+  
+  // SEO and categorization
+  slug            String?     @unique // URL-friendly identifier
+  category        String?
+  
+  // Audit fields
+  deletedAt       DateTime?
+  createdBy       String?
+  updatedBy       String?
+  
+  // Relations
+  orderItems      OrderItem[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  @@index([chefId])
+  @@index([isAvailable])
+  @@index([category])
+  @@index([currency])
+  @@index([deletedAt])
+  // Full-text search index (implement in migration)
+  @@map("dishes")
+}
+
+model DishImage {
+  id       String  @id @default(cuid())
+  dish     Dish    @relation(fields: [dishId], references: [id], onDelete: Cascade)
+  dishId   String
+  url      String
+  isCover  Boolean @default(false)
+  altText  String? // Accessibility
+  
+  // Image metadata
+  width    Int?
+  height   Int?
+  fileSize Int?    // in bytes
+  format   String? // jpg, png, webp
+  
+  createdAt DateTime @default(now())
+  
+  @@index([dishId])
+}
+
+model Order {
+  id                    String       @id @default(cuid())
+  orderNumber           String       @unique // Human-readable order number
+  customer              User         @relation("CustomerOrders", fields: [customerId], references: [id])
+  customerId            String
+  chef                  ChefProfile  @relation("ChefOrders", fields: [chefId], references: [id])
+  chefId                String
+  status                OrderStatus  @default(PENDING)
+  
+  // Order details
+  items                 OrderItem[]
+  totalPrice            Decimal      @db.Decimal(10, 2)
+  currency              String       @default("USD")
+  notes                 String?      // Special instructions
+  
+  // Delivery information
+  deliveryAddress       Address?     @relation(fields: [deliveryAddressId], references: [id])
+  deliveryAddressId     String?
+  deliveryInstructions  String?
+  deliveryFee           Decimal?     @db.Decimal(10, 2)
+  
+  // Timing
+  requestedDeliveryTime DateTime?
+  estimatedDeliveryTime DateTime?
+  actualDeliveryTime    DateTime?
+  
+  // Cancellation
+  cancelledAt           DateTime?
+  cancellationReason    String?
+  cancelledBy           String?      // userId who cancelled
+  
+  // Commission and fees
+  platformFee           Decimal?     @db.Decimal(10, 2)
+  chefEarnings          Decimal?     @db.Decimal(10, 2)
+  
+  // Relations
+  payment               Payment?
+  review                Review?
+  notifications         Notification[]
+  
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  
+  @@index([customerId])
+  @@index([chefId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([orderNumber])
+}
+
+model OrderItem {
+  id                String  @id @default(cuid())
+  order             Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId           String
+  dish              Dish    @relation(fields: [dishId], references: [id])
+  dishId            String
+  quantity          Int     @default(1) // Add constraint: quantity > 0
+  unitPrice         Decimal @db.Decimal(10, 2) // Snapshot of dish price at order time
+  totalPrice        Decimal @db.Decimal(10, 2) // quantity * unitPrice
+  currency          String  @default("USD")
+  
+  // Store dish details as snapshot
+  dishTitle         String
+  dishDescription   String?
+  specialRequests   String? // Item-specific modifications
+  
+  createdAt         DateTime @default(now())
+  
+  @@index([orderId])
+}
+
+model Review {
+  id          String      @id @default(cuid())
+  rating      Int         @db.SmallInt // 1–5 (add constraint in migration)
+  comment     String?
+  customer    User        @relation("CustomerReviews", fields: [customerId], references: [id])
+  customerId  String
+  chef        ChefProfile @relation("ChefReviews", fields: [chefId], references: [id])
+  chefId      String
+  order       Order       @relation(fields: [orderId], references: [id])
+  orderId     String      @unique
+  
+  // Review details
+  foodQuality     Int?    @db.SmallInt // 1-5
+  deliverySpeed   Int?    @db.SmallInt // 1-5
+  presentation    Int?    @db.SmallInt // 1-5
+  communication   Int?    @db.SmallInt // 1-5
+  
+  // Moderation
+  isModerated     Boolean @default(false)
+  isVisible       Boolean @default(true)
+  moderatedBy     String?
+  moderatedAt     DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([chefId])
+  @@index([customerId])
+  @@index([rating])
+  @@index([isVisible])
+  @@unique([customerId, orderId]) // Prevent duplicate reviews per order
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  user            User          @relation(fields: [userId], references: [id])
+  userId          String
+  order           Order         @relation(fields: [orderId], references: [id])
+  orderId         String        @unique
+  
+  // Payment details
+  provider        String        // e.g. "stripe", "paypal"
+  providerId      String        // Stripe paymentIntent ID
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("USD")
+  status          PaymentStatus @default(PENDING)
+  
+  // Additional payment info
+  paymentMethod   String?       // card, bank_transfer, etc.
+  paymentMethodId String?       // Stripe payment method ID
+  failureReason   String?
+  failureCode     String?
+  
+  // Refund information
+  refundAmount    Decimal?      @db.Decimal(10, 2)
+  refundReason    String?
+  refundedAt      DateTime?
+  refundedBy      String?
+  
+  // Metadata
+  metadata        Json?         // Additional payment data
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([providerId])
+  @@index([provider])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  order       Order?           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId     String?
+  
+  type        NotificationType
+  title       String
+  message     String
+  data        Json?            // Additional notification data
+  
+  isRead      Boolean          @default(false)
+  readAt      DateTime?
+  
+  // Delivery tracking
+  isSent      Boolean          @default(false)
+  sentAt      DateTime?
+  deliveryMethod String?       // email, push, sms
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  @@index([userId, isRead])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model AppConfig {
+  id                      String   @id @default(cuid())
+  key                     String   @unique
+  value                   String
+  description             String?
+  dataType                String   @default("string") // string, number, boolean, json
+  
+  updatedBy               String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  
+  @@index([key])
+}
+
+model Currency {
+  id            String   @id @default(cuid())
+  code          String   @unique // USD, EUR, GBP
+  name          String   // US Dollar
+  symbol        String   // $
+  exchangeRate  Decimal  @db.Decimal(10, 6) // Rate relative to base currency
+  isActive      Boolean  @default(true)
+  
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
+// Enums
+enum Role {
+  CUSTOMER
+  CHEF
+  ADMIN
+  MODERATOR
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  IN_PREPARATION
+  READY_FOR_PICKUP
+  READY_FOR_DELIVERY
+  OUT_FOR_DELIVERY
+  DELIVERED
+  REJECTED
+  CANCELLED_BY_CUSTOMER
+  CANCELLED_BY_CHEF
+  REFUND_REQUESTED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+  CANCELLED
+}
+
+enum AddressType {
+  HOME
+  WORK
+  RESTAURANT
+  OTHER
+}
+
+enum NotificationType {
+  ORDER_PLACED
+  ORDER_ACCEPTED
+  ORDER_REJECTED
+  ORDER_IN_PREPARATION
+  ORDER_READY
+  ORDER_OUT_FOR_DELIVERY
+  ORDER_DELIVERED
+  ORDER_CANCELLED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  REVIEW_RECEIVED
+  CHEF_APPLICATION_STATUS
+  SYSTEM_ANNOUNCEMENT
+  PROMOTIONAL
+}
