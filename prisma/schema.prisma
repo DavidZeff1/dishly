@@ -2,70 +2,65 @@ generator client {
   provider = "prisma-client-js"
 }
 
-generator dbml {
-  provider = "prisma-dbml-generator"
-  output   = "../docs"
-  outputName = "database-schema.dbml"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model User {
-  id          String    @id @default(cuid())
-  name        String
-  email       String    @unique
-  password    String
-  role        Role      @default(CUSTOMER)
-  phone       String?   @unique
-  profilePic  String?
-  isActive    Boolean   @default(true)
-  
+  id         String  @id @default(cuid())
+  name       String
+  email      String  @unique
+  password   String
+  role       Role    @default(CUSTOMER)
+  phone      String? @unique
+  profilePic String?
+  isActive   Boolean @default(true)
+
   // Relations
   chefProfile ChefProfile?
-  orders      Order[]    @relation("CustomerOrders")
+  orders      Order[]      @relation("CustomerOrders")
   reviews     Review[]
   payments    Payment[]
-  
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  
+  accounts    Account[]
+  sessions    Session[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
   @@index([email])
   @@index([phone])
 }
 
 model ChefProfile {
-  id            String    @id @default(cuid())
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String    @unique
-  bio           String?
-  cuisineTags   String[]
-  isVerified    Boolean   @default(false)
-  isActive      Boolean   @default(true)
-  
+  id          String   @id @default(cuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String   @unique
+  bio         String?
+  cuisineTags String[]
+  isVerified  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+
   // Location
-  address       String
-  city          String
-  state         String?
-  country       String    @default("US")
-  latitude      Decimal?  @db.Decimal(10, 8)
-  longitude     Decimal?  @db.Decimal(11, 8)
-  
+  address   String
+  city      String
+  state     String?
+  country   String   @default("US")
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+
   // Business settings
-  deliveryRadius    Decimal   @default(10.0) @db.Decimal(5, 2) // km
-  minOrderAmount    Decimal   @default(15.0) @db.Decimal(10, 2)
-  avgDeliveryTime   Int       @default(45) // minutes
-  
+  deliveryRadius  Decimal @default(10.0) @db.Decimal(5, 2) // km
+  minOrderAmount  Decimal @default(15.0) @db.Decimal(10, 2)
+  avgDeliveryTime Int     @default(45) // minutes
+
   // Relations
-  dishes        Dish[]
-  orders        Order[]    @relation("ChefOrders")
-  reviews       Review[]   @relation("ChefReviews")
-  
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  
+  dishes  Dish[]
+  orders  Order[]  @relation("ChefOrders")
+  reviews Review[] @relation("ChefReviews")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([isActive, isVerified])
   @@index([city, state])
   @@index([latitude, longitude])
@@ -78,50 +73,50 @@ model Dish {
   title           String
   description     String
   price           Decimal     @db.Decimal(10, 2)
-  images          String[]    // Array of image URLs
+  images          String[] // Array of image URLs
   isAvailable     Boolean     @default(true)
-  tags            String[]    // ["spicy", "vegetarian"]
-  category        String?     // "Pizza", "Pasta", etc.
-  preparationTime Int?        // in minutes
-  
+  tags            String[] // ["spicy", "vegetarian"]
+  category        String? // "Pizza", "Pasta", etc.
+  preparationTime Int? // in minutes
+
   // Relations
-  orderItems      OrderItem[]
-  
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  
+  orderItems OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([chefId])
   @@index([isAvailable])
   @@index([category])
 }
 
 model Order {
-  id                    String       @id @default(cuid())
-  orderNumber           String       @unique
-  customer              User         @relation("CustomerOrders", fields: [customerId], references: [id])
-  customerId            String
-  chef                  ChefProfile  @relation("ChefOrders", fields: [chefId], references: [id])
-  chefId                String
-  status                OrderStatus  @default(PENDING)
-  
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  customer    User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  customerId  String
+  chef        ChefProfile @relation("ChefOrders", fields: [chefId], references: [id])
+  chefId      String
+  status      OrderStatus @default(PENDING)
+
   // Order details
-  items                 OrderItem[]
-  totalPrice            Decimal      @db.Decimal(10, 2)
-  notes                 String?
-  
+  items      OrderItem[]
+  totalPrice Decimal     @db.Decimal(10, 2)
+  notes      String?
+
   // Delivery
   deliveryAddress       String
-  deliveryFee           Decimal      @default(5.0) @db.Decimal(10, 2)
+  deliveryFee           Decimal   @default(5.0) @db.Decimal(10, 2)
   estimatedDeliveryTime DateTime?
   actualDeliveryTime    DateTime?
-  
+
   // Relations
-  payment               Payment?
-  review                Review?
-  
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
-  
+  payment Payment?
+  review  Review?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([customerId])
   @@index([chefId])
   @@index([status])
@@ -130,58 +125,94 @@ model Order {
 }
 
 model OrderItem {
-  id                String  @id @default(cuid())
-  order             Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderId           String
-  dish              Dish    @relation(fields: [dishId], references: [id])
-  dishId            String
-  quantity          Int     @default(1)
-  unitPrice         Decimal @db.Decimal(10, 2)
-  
+  id        String  @id @default(cuid())
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId   String
+  dish      Dish    @relation(fields: [dishId], references: [id])
+  dishId    String
+  quantity  Int     @default(1)
+  unitPrice Decimal @db.Decimal(10, 2)
+
   // Snapshot data
-  dishTitle         String
-  dishDescription   String?
-  
+  dishTitle       String
+  dishDescription String?
+
   @@index([orderId])
 }
 
 model Review {
-  id          String      @id @default(cuid())
-  rating      Int         @db.SmallInt // 1-5
-  comment     String?
-  customer    User        @relation(fields: [customerId], references: [id])
-  customerId  String
-  chef        ChefProfile @relation("ChefReviews", fields: [chefId], references: [id])
-  chefId      String
-  order       Order       @relation(fields: [orderId], references: [id])
-  orderId     String      @unique
-  
-  createdAt   DateTime    @default(now())
-  
+  id         String      @id @default(cuid())
+  rating     Int         @db.SmallInt // 1-5
+  comment    String?
+  customer   User        @relation(fields: [customerId], references: [id])
+  customerId String
+  chef       ChefProfile @relation("ChefReviews", fields: [chefId], references: [id])
+  chefId     String
+  order      Order       @relation(fields: [orderId], references: [id])
+  orderId    String      @unique
+
+  createdAt DateTime @default(now())
+
+  @@unique([customerId, orderId])
   @@index([chefId])
   @@index([rating])
-  @@unique([customerId, orderId])
 }
 
 model Payment {
-  id              String        @id @default(cuid())
-  user            User          @relation(fields: [userId], references: [id])
-  userId          String
-  order           Order         @relation(fields: [orderId], references: [id])
-  orderId         String        @unique
-  
+  id      String @id @default(cuid())
+  user    User   @relation(fields: [userId], references: [id])
+  userId  String
+  order   Order  @relation(fields: [orderId], references: [id])
+  orderId String @unique
+
   // Payment details
-  provider        String        // "stripe", "paypal"
-  providerId      String        // External payment ID
-  amount          Decimal       @db.Decimal(10, 2)
-  status          PaymentStatus @default(PENDING)
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  
+  provider   String // "stripe", "paypal"
+  providerId String        @unique
+  amount     Decimal       @db.Decimal(10, 2)
+  status     PaymentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([userId])
   @@index([status])
   @@index([providerId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 // Simplified Enums
